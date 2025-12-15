@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Snake Game: AI Autodidata (Local Storage)</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <style>
+        body {
+            margin: 0;
+            background-color: #0f172a; 
+            color: white;
+            font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        
+        @keyframes pulse-slow {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        .animate-pulse-slow {
+            animation: pulse-slow 1.5s infinite ease-in-out;
+        }
+
+        
+        .grid-cell {
+            width: 26px;
+            height: 26px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background-color 0.1s ease-out, transform 0.1s ease-out, box-shadow 0.1s; 
+            line-height: 0; 
+        }
+    </style>
+</head>
+<body>
+
+<div id="root" class="flex flex-col items-center justify-center h-screen bg-gray-950 text-white font-sans overflow-hidden">
+    
+    <div class="p-4 bg-gray-900 border-b border-gray-800 shadow-xl w-full flex justify-center flex-col items-center">
+        <h1 class="text-3xl font-extrabold text-green-400 flex items-center gap-2 mb-2">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" class="text-yellow-400"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+            Snake: AI Autodidata (Local Storage)
+        </h1>
+        
+        <div class="flex items-center gap-6 mt-2">
+            <div class="text-lg font-bold bg-gray-700 px-4 py-1 rounded-full border border-gray-600">
+                Pontuação: <span id="score-display" class="text-yellow-400">0</span>
+            </div>
+            <div id="status-display" class="text-sm font-mono px-4 py-1 rounded-full bg-gray-500 shadow-md transition-colors">
+                Carregando...
+            </div>
+             <div class="text-xs font-mono px-3 py-1 rounded-full bg-gray-700 border border-gray-600">
+                Cache de Erros: <span id="cache-size" class="text-red-400">0</span>
+            </div>
+        </div>
+
+        <div class="flex gap-4 mt-4">
+            
+
+            <button id="btn-ai" class="flex items-center gap-2 px-6 py-2 rounded-lg font-bold shadow-xl transition-all transform hover:scale-105 bg-gray-700 hover:bg-indigo-700 text-white">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"></rect><circle cx="12" cy="5" r="2"></circle><path d="M12 7v4"></path><line x1="8" y1="16" x2="8" y2="16"></line><line x1="16" y1="16" x2="16" y2="16"></line></svg> INICIAR APRENDIZAGEM
+            </button>
+
+            <button id="btn-reset" class="flex items-center gap-2 px-4 py-2 rounded-lg bg-red-600/80 hover:bg-red-500 text-white shadow-lg transition-all">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12A9 9 0 0 0 6 3"></path><path d="M7 6 3 2 7 2"></path><path d="M3 12a9 9 0 0 0 15 9"></path><path d="M17 18 21 22 17 22"></path></svg> RESETAR CACHE LOCAL
+            </button>
+        </div>
+    </div>
+
+    <div class="flex-1 p-4 flex items-center justify-center relative">
+        <div 
+            id="game-grid-container"
+            class="bg-gray-900 p-2 rounded shadow-2xl border border-gray-800 inline-block"
+        >
+            
+        </div>
+
+        
+        <div id="touch-controls" class="absolute top-1/2 -right-24 transform -translate-y-1/2 flex-col items-center p-4 bg-gray-800/80 rounded-xl shadow-xl hidden">
+            <h3 class="text-sm font-bold mb-2 text-gray-300">Controles</h3>
+            <div class="grid grid-cols-3 gap-2">
+                <div class="col-span-1"></div>
+                <button onclick="setManualDirection(-1, 0)" class="p-3 bg-gray-600 hover:bg-gray-500 rounded-lg text-white shadow-md">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m18 15-6-6-6 6"></path></svg>
+                </button>
+                <div class="col-span-1"></div>
+                
+                <button onclick="setManualDirection(0, -1)" class="p-3 bg-gray-600 hover:bg-gray-500 rounded-lg text-white shadow-md">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"></path></svg>
+                </button>
+                <div class="col-span-1"></div>
+                <button onclick="setManualDirection(0, 1)" class="p-3 bg-gray-600 hover:bg-gray-500 rounded-lg text-white shadow-md">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6"></path></svg>
+                </button>
+                
+                <div class="col-span-1"></div>
+                <button onclick="setManualDirection(1, 0)" class="p-3 bg-gray-600 hover:bg-gray-500 rounded-lg text-white shadow-md">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"></path></svg>
+                </button>
+                <div class="col-span-1"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    
+    const LOCAL_STORAGE_KEY = 'snake_ai_bad_moves';
+
+    
+    window.loadBadMoves = function() {
+        try {
+            const data = localStorage.getItem(LOCAL_STORAGE_KEY);
+            if (data) {
+                const movesArray = JSON.parse(data);
+                if (Array.isArray(movesArray)) {
+                    window.badMovesCache = new Set(movesArray);
+                    console.log(`Cache de IA (Local) carregado com ${window.badMovesCache.size} movimentos proibidos.`);
+                    return;
+                }
+            }
+        } catch (error) {
+            console.error("Erro ao carregar cache do Local Storage:", error);
+        }
+        
+        window.badMovesCache = new Set();
+    }
+
+    
+    window.saveBadMoves = function() {
+        try {
+            const movesArray = Array.from(window.badMovesCache);
+            localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(movesArray));
+            console.log(`Cache de IA (Local) salvo com ${movesArray.length} movimentos proibidos.`);
+        } catch (error) {
+            console.error("Erro ao salvar cache no Local Storage:", error);
+        }
+    }
+
+    
+    window.saveScore = function(currentScore) {
+        console.log(`Pontuação de ${currentScore} registrada localmente.`);
+    }
+
+</script>
+
+<script>
+    
+    
+    const ROWS = 20;
+    const COLS = 20;
+    const INITIAL_SPEED = 150; 
+    const MAX_SPEED = 50; 
+    const GAME_MODE = {
+        AI: 'ai',
+        IDLE: 'idle' 
+    };
+    
+    const INITIAL_SNAKE = [
+        { r: 10, c: 5 },
+        { r: 10, c: 4 },
+        { r: 10, c: 3 },
+        { r: 10, c: 2 },
+    ];
+    const NODE_TYPES = {
+        EMPTY: 'empty',
+        FOOD: 'food',
+        SNAKE_HEAD: 'head',
+        SNAKE_BODY: 'body',
+    };
+
+    
+    
+    let snake = [];
+    let food = {};
+    let direction = { dr: 0, dc: 1 };
+    let speed = INITIAL_SPEED;
+    let gameStatus = "Pressione Iniciar para Jogar ou IA";
+    let isRunning = false;
+    let gameMode = GAME_MODE.IDLE;
+    let score = 0;
+    let gameLoopInterval = null;
+    
+    let lastHeadPosition = null; 
+
+    
+    const GRID_CONTAINER = document.getElementById('game-grid-container');
+    const SCORE_DISPLAY = document.getElementById('score-display');
+    const STATUS_DISPLAY = document.getElementById('status-display');
+    const CACHE_SIZE_DISPLAY = document.getElementById('cache-size');
+    const TOUCH_CONTROLS = document.getElementById('touch-controls');
+    
+    const BTN_AI = document.getElementById('btn-ai');
+    const BTN_RESET = document.getElementById('btn-reset');
+
+
+    
+    
+    function getRandomFoodPosition(currentSnake) {
+        let newFood;
+        let valid = false;
+        while (!valid) {
+            newFood = {
+                r: Math.floor(Math.random() * ROWS),
+                c: Math.floor(Math.random() * COLS),
+            };
+            valid = !currentSnake.some(segment => segment.r === newFood.r && segment.c === newFood.c);
+        }
+        return newFood;
+    }
+
+    function getNextHead(currentSnake, currentDirection) {
+        const head = currentSnake[0];
+        return {
+            r: head.r + currentDirection.dr,
+            c: head.c + currentDirection.dc,
+        };
+    }
+
+    
+    
+    function drawGrid() {
+        GRID_CONTAINER.style.display = 'grid';
+        GRID_CONTAINER.style.gridTemplateColumns = `repeat(${COLS}, 26px)`;
+        GRID_CONTAINER.style.gap = '1px';
+        GRID_CONTAINER.innerHTML = ''; 
+        
+        CACHE_SIZE_DISPLAY.textContent = window.badMovesCache.size;
+
+        const snakeSet = new Map(snake.map((s, index) => [
+            `${s.r}-${s.c}`, 
+            index === 0 ? NODE_TYPES.SNAKE_HEAD : NODE_TYPES.SNAKE_BODY
+        ]));
+
+        for (let r = 0; r < ROWS; r++) {
+            for (let c = 0; c < COLS; c++) {
+                const key = `${r}-${c}`;
+                const cell = document.createElement('div');
+                cell.id = `node-${r}-${c}`;
+                
+                cell.className = 'grid-cell rounded-sm transition-all duration-100'; 
+
+                let bgClass = 'bg-gray-800/50';
+                let content = '';
+                let title = '';
+                
+                if (window.badMovesCache.has(key)) {
+                    bgClass = 'bg-yellow-900/40 ring-1 ring-yellow-700';
+                    title = 'Caminho Proibido pela IA';
+                }
+
+                if (r === food.r && c === food.c) {
+                    bgClass = 'bg-red-500/90 animate-pulse-slow rounded-full';
+                    content = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" class="text-white drop-shadow-md"><path d="M3 2v7c0 1.1 0.9 2 2 2h4c1.1 0 2-0.9 2-2V2"></path><path d="M7 21v-1.5c0-1.4 1.4-2.5 2.5-2.5h1.5c1.1 0 2-0.9 2-2V2"></path></svg>`;
+                }
+
+                if (snakeSet.has(key)) {
+                    const type = snakeSet.get(key);
+                    if (type === NODE_TYPES.SNAKE_HEAD) {
+                        bgClass = 'bg-green-400 shadow-xl ring-2 ring-lime-200 z-10 rounded-sm animate-pulse-slow transform scale-120'; 
+                        content = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" class="text-green-900"><circle cx="12" cy="12" r="3"></circle><path d="M12 2v2"></path><path d="M4.93 4.93 6.34 6.34"></path><path d="M2 12h2"></path><path d="M4.93 19.07 6.34 17.66"></path><path d="M12 22v-2"></path><path d="M19.07 19.07 17.66 17.66"></path><path d="M22 12h-2"></path><path d="M19.07 4.93 17.66 6.34"></path></svg>`;
+                    } else {
+                        
+                        bgClass = 'bg-green-600/90 shadow-md rounded-sm transform scale-90'; 
+                        content = `<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" class="text-green-800"><path d="m7 12-5 5 5 5 5-5"></path><path d="m14 12-5 5 5 5 5-5"></path></svg>`;
+                    }
+                }
+                
+                cell.className += ` ${bgClass}`;
+                cell.innerHTML = content;
+                if (title) cell.title = title;
+                GRID_CONTAINER.appendChild(cell);
+            }
+        }
+    }
+
+    function updateUI(newStatus = gameStatus, statusClass = null) {
+        STATUS_DISPLAY.textContent = newStatus;
+        SCORE_DISPLAY.textContent = score;
+        CACHE_SIZE_DISPLAY.textContent = window.badMovesCache.size;
+
+        
+        BTN_AI.className = `flex items-center gap-2 px-6 py-2 rounded-lg font-bold shadow-xl transition-all transform hover:scale-105 ${
+            gameMode === GAME_MODE.AI && isRunning ? 'bg-indigo-600 ring-4 ring-indigo-300/50' : 'bg-gray-700 hover:bg-indigo-700 text-white'
+        }`;
+
+        
+        BTN_AI.disabled = isRunning;
+        
+        if (newStatus === "Em andamento...") {
+            STATUS_DISPLAY.className = `text-sm font-mono px-4 py-1 rounded-full ${gameMode === GAME_MODE.AI ? 'bg-indigo-600 shadow-lg' : 'bg-amber-600 shadow-lg'} transition-colors`;
+        } else if (statusClass) {
+            STATUS_DISPLAY.className = `text-sm font-mono px-4 py-1 rounded-full ${statusClass} transition-colors`;
+        } else {
+            STATUS_DISPLAY.className = 'text-sm font-mono px-4 py-1 rounded-full bg-gray-500 shadow-md transition-colors';
+        }
+
+        
+        TOUCH_CONTROLS.style.display = 'none';
+    }
+
+    
+    function findPath(start, target, currentSnake, ignoreTail = false) {
+        const queue = [{ r: start.r, c: start.c, path: [] }];
+        const visited = new Set();
+        
+        const bodyLength = ignoreTail ? currentSnake.length : currentSnake.length - 1;
+        const bodySet = new Set(currentSnake.slice(0, bodyLength).map(s => `${s.r}-${s.c}`));
+
+        if (!ignoreTail && currentSnake.length > 0) {
+            const tail = currentSnake[currentSnake.length - 1];
+            bodySet.delete(`${tail.r}-${tail.c}`);
+        }
+
+        const moves = [{ dr: -1, dc: 0 }, { dr: 1, dc: 0 }, { dr: 0, dc: -1 }, { dr: 0, dc: 1 }];
+
+        while (queue.length > 0) {
+            const current = queue.shift();
+
+            if (current.r === target.r && current.c === target.c) {
+                return current.path; 
+            }
+            
+            for (const { dr, dc } of moves) {
+                const nextR = current.r + dr;
+                const nextC = current.c + dc;
+                const nextKey = `${nextR}-${nextC}`;
+                
+                if (nextR < 0 || nextR >= ROWS || nextC < 0 || nextC >= COLS) continue;
+                
+                if (bodySet.has(nextKey)) continue;
+
+                
+                if (window.badMovesCache.has(nextKey)) continue; 
+
+                if (visited.has(nextKey)) continue;
+
+                visited.add(nextKey);
+                queue.push({
+                    r: nextR,
+                    c: nextC,
+                    path: [...current.path, { dr, dc }]
+                });
+            }
+        }
+        
+        return null; 
+    }
+
+    
+    function getAIDirection() {
+        const head = snake[0];
+        let currentDirection = direction;
+
+        
+        const pathFood = findPath(head, food, snake);
+        
+        if (pathFood && pathFood.length > 0) {
+            return pathFood[0];
+        } 
+        
+        
+        
+        const moves = [{ dr: 0, dc: 1 }, { dr: 0, dc: -1 }, { dr: 1, dc: 0 }, { dr: -1, dc: 0 }];
+        
+        let safeMoves = [];
+        
+        
+        for (const move of moves) {
+            const nextHead = getNextHead(snake, move);
+            const nextKey = `${nextHead.r}-${nextHead.c}`;
+
+            
+            const isCollision = nextHead.r < 0 || nextHead.r >= ROWS ||
+                                nextHead.c < 0 || nextHead.c >= COLS ||
+                                snake.slice(0, -1).some(s => s.r === nextHead.r && s.c === nextHead.c);
+
+            
+            const isLearnedBadMove = window.badMovesCache.has(nextKey);
+            
+            if (!isCollision && !isLearnedBadMove) {
+                safeMoves.push(move);
+            }
+        }
+        
+        if (safeMoves.length > 0) {
+            
+            
+            let preferredOrder = [];
+            const currentR = currentDirection.dr;
+            const currentC = currentDirection.dc;
+            
+            
+            preferredOrder.push(safeMoves.find(m => m.dr === currentR && m.dc === currentC));
+            
+            
+            const ortho1 = safeMoves.find(m => m.dr === -currentC && m.dc === currentR);
+            const ortho2 = safeMoves.find(m => m.dr === currentC && m.dc === -currentR);
+            if (ortho1) preferredOrder.push(ortho1);
+            if (ortho2) preferredOrder.push(ortho2);
+
+            
+            preferredOrder.push(safeMoves.find(m => m.dr === -currentR && m.dc === -currentC));
+
+            
+            const finalMove = preferredOrder.filter(m => m !== undefined && m !== null)[0];
+            
+            return finalMove || safeMoves[0]; 
+        }
+
+        
+        
+        
+        
+        const currentMoves = moves.filter(move => {
+            const nextHead = getNextHead(snake, move);
+            
+            
+            const isSafe = nextHead.r >= 0 && nextHead.r < ROWS &&
+                   nextHead.c >= 0 && nextHead.c < COLS &&
+                   !snake.slice(0, -1).some(s => s.r === nextHead.r && s.c === nextHead.c);
+            
+            return isSafe;
+        });
+
+        if (currentMoves.length > 0) {
+             
+            const safeDirection = currentMoves.find(move => !(move.dr === -currentDirection.dr && move.dc === -currentDirection.dc));
+            return safeDirection || currentMoves[0];
+        }
+
+
+        
+        return currentDirection;
+    }
+
+    
+    
+    
+
+    function endGame(message, headPosition) {
+        if (!isRunning) {
+            if (message && message !== "Em andamento...") {
+                updateUI(message);
+            }
+            return; 
+        }
+
+        isRunning = false;
+        clearInterval(gameLoopInterval);
+        
+        if (message.includes("Colisão")) {
+            
+            if (gameMode === GAME_MODE.AI && headPosition) {
+                window.badMovesCache.add(`${headPosition.r}-${headPosition.c}`);
+                window.saveBadMoves(); 
+            }
+            
+            
+            if (gameMode === GAME_MODE.AI) {
+                updateUI("IA perdeu! Erro na posição: (" + headPosition.r + ", " + headPosition.c + "). Reiniciando...", 'bg-red-800 shadow-xl');
+                setTimeout(() => {
+                    startGame(GAME_MODE.AI); 
+                }, 1000);
+            } else {
+                 updateUI("Game Over! " + message, 'bg-red-600 shadow-lg');
+            }
+        } else {
+            updateUI(message);
+        }
+    }
+
+    function gameTick() {
+        let currentDirection;
+        
+        if (gameMode === GAME_MODE.AI) {
+            currentDirection = getAIDirection();
+        } else {
+            currentDirection = direction;
+        }
+
+        const newHead = getNextHead(snake, currentDirection);
+        lastHeadPosition = newHead;
+
+        const bodyForCollisionCheck = snake.slice(0, snake.length - 1); 
+        
+        const collidesWithBody = bodyForCollisionCheck.some((segment, index) => 
+            index !== 0 && segment.r === newHead.r && segment.c === newHead.c
+        );
+
+        if (
+            newHead.r < 0 || newHead.r >= ROWS ||
+            newHead.c < 0 || newHead.c >= COLS ||
+            collidesWithBody 
+        ) {
+            endGame("Colisão.", newHead); 
+            return;
+        }
+
+        const newSnake = [newHead, ...snake];
+        let ateFood = false;
+
+        if (newHead.r === food.r && newHead.c === food.c) {
+            score++;
+            speed = Math.max(MAX_SPEED, speed - 5); 
+            food = getRandomFoodPosition(newSnake);
+            ateFood = true;
+        } else {
+            newSnake.pop(); 
+        }
+
+        snake = newSnake;
+        direction = currentDirection; 
+
+        if (ateFood) {
+            clearInterval(gameLoopInterval);
+            gameLoopInterval = setInterval(gameTick, speed);
+        }
+
+        updateUI("Em andamento...");
+        drawGrid();
+    }
+
+    function startGame(mode) {
+        snake = [...INITIAL_SNAKE];
+        food = getRandomFoodPosition(snake);
+        direction = { dr: 0, dc: 1 };
+        speed = INITIAL_SPEED;
+        score = 0;
+        gameMode = mode;
+        isRunning = true;
+        
+        if (gameLoopInterval) {
+             clearInterval(gameLoopInterval);
+        }
+        
+        endGame("Em andamento...");
+        gameLoopInterval = setInterval(gameTick, speed);
+        updateUI("Em andamento...");
+        drawGrid();
+    }
+
+    function resetGame() {
+        endGame("Pressione Iniciar para Jogar ou IA");
+        snake = [...INITIAL_SNAKE];
+        food = getRandomFoodPosition(snake);
+        score = 0;
+        gameMode = GAME_MODE.IDLE;
+        window.badMovesCache = new Set(); 
+        window.saveBadMoves(); 
+        drawGrid();
+    }
+
+    
+    
+    
+
+    function handleKeyDown(e) {
+        if (!isRunning || gameMode !== GAME_MODE.HUMAN) return;
+
+        const newDirection = { dr: 0, dc: 0 };
+
+        if (e.key === 'ArrowUp') newDirection.dr = -1;
+        else if (e.key === 'ArrowDown') newDirection.dr = 1;
+        else if (e.key === 'ArrowLeft') newDirection.dc = -1;
+        else if (e.key === 'ArrowRight') newDirection.dc = 1;
+
+        if (newDirection.dr !== 0 || newDirection.dc !== 0) {
+            if (!(newDirection.dr === -direction.dr && newDirection.dc === -direction.dc)) {
+                direction = newDirection;
+            }
+        }
+    }
+
+    window.addEventListener('keydown', handleKeyDown);
+
+    window.setManualDirection = function(dr, dc) {
+        if (!isRunning || gameMode !== GAME_MODE.HUMAN) return;
+        const newDirection = { dr, dc };
+        if (!(newDirection.dr === -direction.dr && newDirection.dc === -direction.dc)) { 
+            direction = newDirection;
+        }
+    }
+
+    
+    window.initializeGame = function() {
+        
+        BTN_AI.addEventListener('click', () => startGame(GAME_MODE.AI));
+        BTN_RESET.addEventListener('click', resetGame);
+        
+        endGame("Carregamento concluído. IA pronta.", 'bg-gray-500 shadow-md'); 
+        
+        setTimeout(() => {
+             startGame(GAME_MODE.AI);
+        }, 500); 
+    };
+
+    document.addEventListener('DOMContentLoaded', () => {
+         window.loadBadMoves(); 
+         window.initializeGame();
+    });
+
+</script>
+
+</body>
+</html>
