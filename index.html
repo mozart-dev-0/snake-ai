@@ -3,610 +3,728 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Snake Game: AI Autodidata (Local Storage)</title>
-    
+    <title>Snake AI Imortal (BFS)</title>
     <script src="https://cdn.tailwindcss.com"></script>
-
     <style>
+        /* Define a fonte Inter */
         body {
-            margin: 0;
-            background-color: #0f172a; 
-            color: white;
-            font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-            overflow: hidden;
-            user-select: none;
+            font-family: 'Inter', sans-serif;
         }
-
-        
-        @keyframes pulse-slow {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
+        /* Estilos adicionais para o jogo */
+        .grid-container {
+            display: grid;
+            border-radius: 0.5rem;
+            box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.5);
         }
-        .animate-pulse-slow {
-            animation: pulse-slow 1.5s infinite ease-in-out;
+        .cell {
+            position: relative;
+            box-sizing: border-box;
+            border: 1px solid rgba(17, 24, 39, 0.1); /* Cor sutil para as células */
         }
-
-        
-        .grid-cell {
-            width: 26px;
-            height: 26px;
+        .snake-head {
+            background-color: #10b981; /* green-500 */
+            border-radius: 50%;
+            box-shadow: 0 0 12px rgba(16, 185, 129, 0.7);
+        }
+        .snake-body {
+            background-color: #34d399; /* green-400 */
+            border-radius: 4px;
+            box-shadow: 0 0 4px rgba(52, 211, 153, 0.5);
+        }
+        .snake-tail {
+            background-color: #047857; /* green-700 */
+            border-radius: 4px;
+        }
+        .food {
+            background-color: #ef4444; /* red-500 */
+            border-radius: 50%;
+            box-shadow: 0 0 12px rgba(239, 68, 68, 0.8);
             display: flex;
             align-items: center;
             justify-content: center;
-            transition: background-color 0.1s ease-out, transform 0.1s ease-out, box-shadow 0.1s; 
-            line-height: 0; 
+            font-size: 14px;
+        }
+        .path {
+            background-color: rgba(59, 130, 246, 0.3); /* blue-500/30 */
+            border-radius: 50%;
         }
     </style>
 </head>
-<body>
+<body class="bg-gray-950 min-h-screen flex items-center justify-center p-4">
 
-<div id="root" class="flex flex-col items-center justify-center h-screen bg-gray-950 text-white font-sans overflow-hidden">
-    
-    <div class="p-4 bg-gray-900 border-b border-gray-800 shadow-xl w-full flex justify-center flex-col items-center">
-        <h1 class="text-3xl font-extrabold text-green-400 flex items-center gap-2 mb-2">
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" class="text-yellow-400"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
-            Snake: AI Autodidata (Local Storage)
-        </h1>
+    <div id="app" class="bg-gray-900 rounded-2xl shadow-2xl p-6 max-w-4xl w-full border border-gray-800">
+        <div class="text-center mb-4">
+            <h1 class="text-4xl font-bold text-green-500 mb-2 flex items-center justify-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-blue-500"><polygon points="3 11 22 2 13 21 11 13 3 11"></polygon></svg>
+                Snake AI Imortal (Safe Path BFS)
+            </h1>
+            <p class="text-gray-400">
+                Busca a rota mais curta para a cereja, garantindo sempre um caminho de escape para a cauda.
+            </p>
+        </div>
+
+        <div id="stats-grid" class="grid grid-cols-4 gap-3 mb-4 text-center">
+            <!-- Stats serão injetadas aqui -->
+        </div>
+
+        <div class="flex justify-between items-center mb-4 gap-2 flex-wrap">
+            <div id="path-status" class="px-4 py-2 rounded-lg border bg-green-900/50 border-green-700">
+                <!-- Status do Caminho injetado aqui -->
+            </div>
+            <div id="strategy-status" class="bg-gray-700/50 px-4 py-2 rounded-lg border border-gray-600">
+                <!-- Estratégia injetada aqui -->
+            </div>
+          
+            <div id="immortal-control" class="flex items-center bg-gray-800 px-3 py-2 rounded-lg border border-gray-700">
+                <!-- Controle Imortal injetado aqui -->
+            </div>
+
+            <div class="flex gap-2">
+                <button id="play-pause-btn" class="bg-green-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-green-700 transition-all flex items-center gap-2 shadow-md hover:shadow-lg">
+                    <svg id="play-pause-icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                    <span id="play-pause-text">Iniciar</span>
+                </button>
+                <button id="hard-reset-btn" class="bg-red-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-red-700 transition-all flex items-center gap-2 shadow-md hover:shadow-lg">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.746 2.746m12.746 8.508a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.746-2.746M12 3v3m0 12v3"></path><path d="M12 12h.01"></path></svg>
+                    Reset
+                </button>
+            </div>
+        </div>
         
-        <div class="flex items-center gap-6 mt-2">
-            <div class="text-lg font-bold bg-gray-700 px-4 py-1 rounded-full border border-gray-600">
-                Pontuação: <span id="score-display" class="text-yellow-400">0</span>
+        <div class="flex justify-center mb-4 gap-4">
+            <div id="auto-reset-control" class="bg-gray-800 px-3 py-2 rounded-lg border border-gray-700 flex items-center gap-2">
+                <label class="text-xs text-gray-400">Auto-reset:</label>
+                <input id="auto-reset-input" type="number" value="200" min="10" max="900" class="w-16 px-2 py-1 bg-gray-700 text-white text-sm rounded border border-gray-600 focus:border-blue-500 focus:outline-none"/>
+                <span class="text-xs text-gray-400">células</span>
             </div>
-            <div id="status-display" class="text-sm font-mono px-4 py-1 rounded-full bg-gray-500 shadow-md transition-colors">
-                Carregando...
-            </div>
-             <div class="text-xs font-mono px-3 py-1 rounded-full bg-gray-700 border border-gray-600">
-                Cache de Erros: <span id="cache-size" class="text-red-400">0</span>
+
+            <div id="speed-control" class="bg-gray-800 px-3 py-2 rounded-lg border border-gray-700 flex items-center gap-2">
+                <label class="text-xs text-gray-400">Velocidade (ms):</label>
+                <input id="game-delay-input" type="number" value="60" min="1" max="500" class="w-16 px-2 py-1 bg-gray-700 text-white text-sm rounded border border-gray-600 focus:border-blue-500 focus:outline-none"/>
             </div>
         </div>
 
-        <div class="flex gap-4 mt-4">
-            
-
-            <button id="btn-ai" class="flex items-center gap-2 px-6 py-2 rounded-lg font-bold shadow-xl transition-all transform hover:scale-105 bg-gray-700 hover:bg-indigo-700 text-white">
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"></rect><circle cx="12" cy="5" r="2"></circle><path d="M12 7v4"></path><line x1="8" y1="16" x2="8" y2="16"></line><line x1="16" y1="16" x2="16" y2="16"></line></svg> INICIAR APRENDIZAGEM
-            </button>
-
-            <button id="btn-reset" class="flex items-center gap-2 px-4 py-2 rounded-lg bg-red-600/80 hover:bg-red-500 text-white shadow-lg transition-all">
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12A9 9 0 0 0 6 3"></path><path d="M7 6 3 2 7 2"></path><path d="M3 12a9 9 0 0 0 15 9"></path><path d="M17 18 21 22 17 22"></path></svg> RESETAR CACHE LOCAL
-            </button>
-        </div>
-    </div>
-
-    <div class="flex-1 p-4 flex items-center justify-center relative">
-        <div 
-            id="game-grid-container"
-            class="bg-gray-900 p-2 rounded shadow-2xl border border-gray-800 inline-block"
-        >
-            
+        <div id="game-area-container" class="relative bg-black rounded-lg mx-auto border-2 border-green-700/50 shadow-inner shadow-green-900/50" style="width: 540px; height: 540px;">
+            <!-- O grid e o jogo serão injetados aqui -->
+            <div id="game-grid" class="grid-container absolute inset-0"></div>
+            <div id="food-indicator" class="absolute top-2 left-2 bg-red-600/90 text-white px-3 py-1 rounded-lg text-xs font-bold shadow-lg flex items-center gap-2 z-20"></div>
         </div>
 
+        <div class="mt-4 text-center text-sm text-gray-500">
+            <p class="flex items-center justify-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-blue-400"><polygon points="3 11 22 2 13 21 11 13 3 11"></polygon></svg>
+                Prioridade: 1. Caminho Seguro para Cereja | 2. Caminho para Cauda (Liberar Espaço) | 3. Movimento mais Seguro.
+            </p>
+            <p id="footer-stats" class="text-xs mt-1">
+                <!-- Stats do Footer injetados aqui -->
+            </p>
+        </div>
+      </div>
+
+    <script>
+        // --- CONSTANTES ---
+        const GRID_SIZE = 30;
+        const CELL_SIZE = 18;
+        const DEFAULT_GAME_DELAY = 60;
+        const AGGRESSIVE_SIZE_THRESHOLD = 25;
+        const AGGRESSIVE_HUNGER_THRESHOLD = 50;
+        const TIMEOUT_MOVES = 1000;
+
+        // --- ESTADO GLOBAL ---
+        let gameState = {};
+        let isPlaying = false;
+        let gameInterval = null;
+        let bestScore = 0;
+        let totalGames = 0;
+        let generation = 1;
+        let isImmortal = false;
+        let gameDelay = DEFAULT_GAME_DELAY;
+        let visualPath = [];
+
+        // --- REFERÊNCIAS DO DOM ---
+        const gameGridEl = document.getElementById('game-grid');
+        const playPauseBtn = document.getElementById('play-pause-btn');
+        const playPauseText = document.getElementById('play-pause-text');
+        const playPauseIcon = document.getElementById('play-pause-icon');
+        const hardResetBtn = document.getElementById('hard-reset-btn');
+        const autoResetInput = document.getElementById('auto-reset-input');
+        const gameDelayInput = document.getElementById('game-delay-input');
+        const immortalControlEl = document.getElementById('immortal-control');
+        const statsGridEl = document.getElementById('stats-grid');
+        const foodIndicatorEl = document.getElementById('food-indicator');
+        const footerStatsEl = document.getElementById('footer-stats');
+        const pathStatusEl = document.getElementById('path-status');
+        const strategyStatusEl = document.getElementById('strategy-status');
+        const gameAreaContainerEl = document.getElementById('game-area-container');
+
+        // --- FUNÇÕES DE UTILIDADE ---
+
+        function generateFood(snakeBody) {
+            let newFood;
+            do {
+                newFood = {
+                    x: Math.floor(Math.random() * GRID_SIZE),
+                    y: Math.floor(Math.random() * GRID_SIZE)
+                };
+            } while (snakeBody.some(seg => seg.x === newFood.x && seg.y === newFood.y));
+            return newFood;
+        }
+
+        function resetGame() {
+            const startPos = { x: 15, y: 15 };
+            gameState = {
+                snake: [startPos],
+                food: generateFood([startPos]),
+                direction: { x: 1, y: 0 },
+                score: 0,
+                movesWithoutFood: 0,
+                gameOver: false,
+                survivalBonus: 0,
+                cherriesEaten: 0
+            };
+            visualPath = [];
+            render();
+            stopGameLoop();
+        }
+
+        function startGameLoop() {
+            if (gameInterval) clearInterval(gameInterval);
+            if (!gameState.gameOver) {
+                gameInterval = setInterval(gameStep, gameDelay);
+            }
+            isPlaying = true;
+            renderUIControls();
+        }
+
+        function stopGameLoop() {
+            if (gameInterval) clearInterval(gameInterval);
+            gameInterval = null;
+            isPlaying = false;
+            renderUIControls();
+        }
         
-        <div id="touch-controls" class="absolute top-1/2 -right-24 transform -translate-y-1/2 flex-col items-center p-4 bg-gray-800/80 rounded-xl shadow-xl hidden">
-            <h3 class="text-sm font-bold mb-2 text-gray-300">Controles</h3>
-            <div class="grid grid-cols-3 gap-2">
-                <div class="col-span-1"></div>
-                <button onclick="setManualDirection(-1, 0)" class="p-3 bg-gray-600 hover:bg-gray-500 rounded-lg text-white shadow-md">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m18 15-6-6-6 6"></path></svg>
-                </button>
-                <div class="col-span-1"></div>
-                
-                <button onclick="setManualDirection(0, -1)" class="p-3 bg-gray-600 hover:bg-gray-500 rounded-lg text-white shadow-md">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"></path></svg>
-                </button>
-                <div class="col-span-1"></div>
-                <button onclick="setManualDirection(0, 1)" class="p-3 bg-gray-600 hover:bg-gray-500 rounded-lg text-white shadow-md">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6"></path></svg>
-                </button>
-                
-                <div class="col-span-1"></div>
-                <button onclick="setManualDirection(1, 0)" class="p-3 bg-gray-600 hover:bg-gray-500 rounded-lg text-white shadow-md">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"></path></svg>
-                </button>
-                <div class="col-span-1"></div>
-            </div>
-        </div>
-    </div>
-</div>
+        // --- LÓGICA DE PATHFINDING (BFS) ---
 
-<script>
-    
-    const LOCAL_STORAGE_KEY = 'snake_ai_bad_moves';
+        /**
+         * Encontra o caminho mais curto entre 'start' e 'target' usando BFS.
+         */
+        function findPathBFS(start, target, snake) {
+            const queue = [{ pos: start, path: [], coordPath: [start] }];
+            const visited = new Set([`${start.x},${start.y}`]);
+            
+            const snakeBody = new Set(
+                snake.slice(0, target === snake[snake.length - 1] ? undefined : -1)
+                    .map(seg => `${seg.x},${seg.y}`)
+            );
 
-    
-    window.loadBadMoves = function() {
-        try {
-            const data = localStorage.getItem(LOCAL_STORAGE_KEY);
-            if (data) {
-                const movesArray = JSON.parse(data);
-                if (Array.isArray(movesArray)) {
-                    window.badMovesCache = new Set(movesArray);
-                    console.log(`Cache de IA (Local) carregado com ${window.badMovesCache.size} movimentos proibidos.`);
+            const directions = [
+                { x: 0, y: -1 }, { x: 0, y: 1 }, { x: -1, y: 0 }, { x: 1, y: 0 }
+            ];
+
+            while (queue.length > 0) {
+                const { pos, path, coordPath } = queue.shift();
+
+                if (pos.x === target.x && pos.y === target.y) {
+                    return { directions: path, coordinates: coordPath };
+                }
+
+                for (const dir of directions) {
+                    let newX = pos.x + dir.x;
+                    let newY = pos.y + dir.y;
+                    
+                    if (newX < 0 || newX >= GRID_SIZE || newY < 0 || newY >= GRID_SIZE) {
+                        continue;
+                    }
+
+                    const newKey = `${newX},${newY}`;
+
+                    if (snakeBody.has(newKey)) {
+                        continue;
+                    }
+
+                    if (visited.has(newKey)) {
+                        continue;
+                    }
+
+                    visited.add(newKey);
+                    queue.push({
+                        pos: { x: newX, y: newY },
+                        path: [...path, dir],
+                        coordPath: [...coordPath, { x: newX, y: newY }]
+                    });
+                }
+            }
+            return null;
+        }
+
+        /**
+         * Verifica se o caminho para a cauda (escape) é mantido após um movimento.
+         */
+        function isPathSafe(head, direction, snake, food) {
+            const newHead = { x: head.x + direction.x, y: head.y + direction.y };
+            
+            if (newHead.x < 0 || newHead.x >= GRID_SIZE || newHead.y < 0 || newHead.y >= GRID_SIZE) {
+                return false;
+            }
+            if (snake.slice(0, -1).some(seg => seg.x === newHead.x && seg.y === newHead.y)) {
+                return false;
+            }
+            
+            const simulatedSnake = [newHead, ...snake];
+            
+            if (newHead.x !== food.x || newHead.y !== food.y) {
+                simulatedSnake.pop(); 
+            }
+            
+            if (simulatedSnake.length >= GRID_SIZE * GRID_SIZE) return true; 
+
+            const tail = simulatedSnake[simulatedSnake.length - 1];
+            const pathResult = findPathBFS(newHead, tail, simulatedSnake);
+            
+            return pathResult !== null;
+        }
+
+        /**
+         * Encontra o movimento mais seguro como último recurso.
+         */
+        function getSafestMove(head, currentDir, snake, food) {
+            const directions = [
+                currentDir,
+                { x: currentDir.y, y: -currentDir.x }, 
+                { x: -currentDir.y, y: currentDir.x }, 
+            ];
+            
+            // 1. Tentar manter rota SEGURA (path to tail)
+            for (const dir of directions) {
+                if (isPathSafe(head, dir, snake, food)) {
+                    return dir;
+                }
+            }
+            
+            // 2. Se falhar, tentar o movimento que evita apenas COLISÃO IMEDIATA.
+            for (const dir of directions) {
+                const testHead = { x: head.x + dir.x, y: head.y + dir.y };
+                
+                if (testHead.x >= 0 && testHead.x < GRID_SIZE && 
+                    testHead.y >= 0 && testHead.y < GRID_SIZE &&
+                    !snake.slice(0, -1).some(seg => seg.x === testHead.x && seg.y === testHead.y)) {
+                    return dir;
+                }
+            }
+            
+            return currentDir;
+        }
+
+        // --- LÓGICA DO JOGO (GAME STEP) ---
+
+        function gameStep() {
+            if (gameState.gameOver) return;
+            
+            const prev = gameState;
+            const autoResetSize = parseInt(autoResetInput.value) || 200;
+
+            // 1. Condição de Auto-Reset
+            if (prev.snake.length >= autoResetSize) {
+                // Simplificado: Sem rastreamento de scoreRef, apenas reset
+                if (prev.score > bestScore) bestScore = prev.score;
+                totalGames++;
+                generation++;
+                setTimeout(resetGame, 500);
+                gameState = { ...prev, gameOver: true, score: prev.score + 1000 }; 
+                render();
+                return;
+            }
+
+            const head = prev.snake[0];
+            let newDirection = getSafestMove(head, prev.direction, prev.snake, prev.food);
+            let currentStrategy = '⚠️ Modo sobrevivência (Fallback)';
+            let pathCoordinates = [];
+
+            const pathResultToFood = findPathBFS(head, prev.food, prev.snake);
+            
+            // --- LÓGICA DE DECISÃO DE IA ---
+
+            if (isImmortal) {
+                // MODO IMORTAL: Rota mais curta
+                if (pathResultToFood && pathResultToFood.directions.length > 0) {
+                    newDirection = pathResultToFood.directions[0];
+                    currentStrategy = '👑 MODO IMORTAL (Rota Direta)';
+                    pathCoordinates = pathResultToFood.coordinates;
+                    renderPathStatus(true, pathResultToFood.directions.length, currentStrategy);
+                } else {
+                    currentStrategy = '👑 MODO IMORTAL (Busca Segura)';
+                    renderPathStatus(false, 0, currentStrategy);
+                }
+            } else {
+                // MODO NORMAL: Lógica de segurança
+                const shortSnakeAggression = prev.snake.length < AGGRESSIVE_SIZE_THRESHOLD; 
+                const shouldForceAggression = prev.movesWithoutFood >= AGGRESSIVE_HUNGER_THRESHOLD;
+
+                if (pathResultToFood && pathResultToFood.directions.length > 0) {
+                    const candidateDir = pathResultToFood.directions[0];
+                    
+                    if (shortSnakeAggression || shouldForceAggression || isPathSafe(head, candidateDir, prev.snake, prev.food)) {
+                        newDirection = candidateDir;
+                        
+                        if (shouldForceAggression) {
+                            currentStrategy = '🔥 FOME EXTREMA (Quebra Deadlock)';
+                        } else if (shortSnakeAggression) {
+                            currentStrategy = `⚡ Rota Agressiva (Tamanho < ${AGGRESSIVE_SIZE_THRESHOLD})`;
+                        } else {
+                            currentStrategy = '✅ Rota Segura para Cereja';
+                        }
+                        
+                        pathCoordinates = pathResultToFood.coordinates;
+                        renderPathStatus(true, pathResultToFood.directions.length, currentStrategy);
+                    } else {
+                        // Rota insegura, ir para a cauda
+                        const tail = prev.snake[prev.snake.length - 1];
+                        const pathResultToTail = findPathBFS(head, tail, prev.snake);
+                        
+                        if (pathResultToTail && pathResultToTail.directions.length > 0) {
+                            newDirection = pathResultToTail.directions[0];
+                            currentStrategy = '🔄 Limpando Rota (Path to Tail)';
+                            pathCoordinates = pathResultToTail.coordinates;
+                            renderPathStatus(false, pathResultToTail.directions.length, currentStrategy);
+                        } else {
+                            renderPathStatus(false, 0, currentStrategy);
+                        }
+                    }
+                } else {
+                    // Sem caminho para cereja, ir para a cauda (fallback)
+                    const tail = prev.snake[prev.snake.length - 1];
+                    const pathResultToTail = findPathBFS(head, tail, prev.snake);
+                    
+                    if (pathResultToTail && pathResultToTail.directions.length > 0) {
+                        newDirection = pathResultToTail.directions[0];
+                        currentStrategy = '🔄 Cauda (Caminho bloqueado)';
+                        pathCoordinates = pathResultToTail.coordinates;
+                        renderPathStatus(false, pathResultToTail.directions.length, currentStrategy);
+                    } else {
+                        renderPathStatus(false, 0, currentStrategy);
+                    }
+                }
+            }
+            
+            // Renderiza a estratégia (após todas as decisões de rota)
+            renderStrategy(currentStrategy);
+
+            visualPath = pathCoordinates;
+            
+            // 2. Simular Novo Movimento
+            let newHead = {
+                x: head.x + newDirection.x,
+                y: head.y + newDirection.y
+            };
+
+            const isWallCollision = (
+                newHead.x < 0 || newHead.x >= GRID_SIZE ||
+                newHead.y < 0 || newHead.y >= GRID_SIZE
+            );
+
+            const isBodyCollision = (
+                prev.snake.some(seg => seg.x === newHead.x && seg.y === newHead.y)
+            );
+            
+            // --- TRATAMENTO DE COLISÃO ---
+            let shouldBlockMovement = false;
+        
+            if (isImmortal) {
+                // No Modo Imortal, apenas a parede bloqueia. Colisão de corpo é ignorada.
+                if (isWallCollision) {
+                    shouldBlockMovement = true;
+                    currentStrategy = '🛑 Colisão de PAREDE Bloqueada (Imortal)';
+                }
+            } else {
+                // No Modo Normal, colisão de parede OU corpo é fatal.
+                if (isWallCollision || isBodyCollision) {
+                    // Game Over (Lógica de Morte Original para o modo NORMAL)
+                    if (prev.score > bestScore) bestScore = prev.score;
+                    totalGames++;
+                    generation++;
+                    stopGameLoop();
+                    setTimeout(resetGame, 500);
+                    gameState = { ...prev, gameOver: true, survivalBonus: 0 };
+                    render();
                     return;
                 }
             }
-        } catch (error) {
-            console.error("Erro ao carregar cache do Local Storage:", error);
-        }
-        
-        window.badMovesCache = new Set();
-    }
-
-    
-    window.saveBadMoves = function() {
-        try {
-            const movesArray = Array.from(window.badMovesCache);
-            localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(movesArray));
-            console.log(`Cache de IA (Local) salvo com ${movesArray.length} movimentos proibidos.`);
-        } catch (error) {
-            console.error("Erro ao salvar cache no Local Storage:", error);
-        }
-    }
-
-    
-    window.saveScore = function(currentScore) {
-        console.log(`Pontuação de ${currentScore} registrada localmente.`);
-    }
-
-</script>
-
-<script>
-    
-    
-    const ROWS = 20;
-    const COLS = 20;
-    const INITIAL_SPEED = 150; 
-    const MAX_SPEED = 50; 
-    const GAME_MODE = {
-        AI: 'ai',
-        IDLE: 'idle' 
-    };
-    
-    const INITIAL_SNAKE = [
-        { r: 10, c: 5 },
-        { r: 10, c: 4 },
-        { r: 10, c: 3 },
-        { r: 10, c: 2 },
-    ];
-    const NODE_TYPES = {
-        EMPTY: 'empty',
-        FOOD: 'food',
-        SNAKE_HEAD: 'head',
-        SNAKE_BODY: 'body',
-    };
-
-    
-    
-    let snake = [];
-    let food = {};
-    let direction = { dr: 0, dc: 1 };
-    let speed = INITIAL_SPEED;
-    let gameStatus = "Pressione Iniciar para Jogar ou IA";
-    let isRunning = false;
-    let gameMode = GAME_MODE.IDLE;
-    let score = 0;
-    let gameLoopInterval = null;
-    
-    let lastHeadPosition = null; 
-
-    
-    const GRID_CONTAINER = document.getElementById('game-grid-container');
-    const SCORE_DISPLAY = document.getElementById('score-display');
-    const STATUS_DISPLAY = document.getElementById('status-display');
-    const CACHE_SIZE_DISPLAY = document.getElementById('cache-size');
-    const TOUCH_CONTROLS = document.getElementById('touch-controls');
-    
-    const BTN_AI = document.getElementById('btn-ai');
-    const BTN_RESET = document.getElementById('btn-reset');
-
-
-    
-    
-    function getRandomFoodPosition(currentSnake) {
-        let newFood;
-        let valid = false;
-        while (!valid) {
-            newFood = {
-                r: Math.floor(Math.random() * ROWS),
-                c: Math.floor(Math.random() * COLS),
-            };
-            valid = !currentSnake.some(segment => segment.r === newFood.r && segment.c === newFood.c);
-        }
-        return newFood;
-    }
-
-    function getNextHead(currentSnake, currentDirection) {
-        const head = currentSnake[0];
-        return {
-            r: head.r + currentDirection.dr,
-            c: head.c + currentDirection.dc,
-        };
-    }
-
-    
-    
-    function drawGrid() {
-        GRID_CONTAINER.style.display = 'grid';
-        GRID_CONTAINER.style.gridTemplateColumns = `repeat(${COLS}, 26px)`;
-        GRID_CONTAINER.style.gap = '1px';
-        GRID_CONTAINER.innerHTML = ''; 
-        
-        CACHE_SIZE_DISPLAY.textContent = window.badMovesCache.size;
-
-        const snakeSet = new Map(snake.map((s, index) => [
-            `${s.r}-${s.c}`, 
-            index === 0 ? NODE_TYPES.SNAKE_HEAD : NODE_TYPES.SNAKE_BODY
-        ]));
-
-        for (let r = 0; r < ROWS; r++) {
-            for (let c = 0; c < COLS; c++) {
-                const key = `${r}-${c}`;
-                const cell = document.createElement('div');
-                cell.id = `node-${r}-${c}`;
+            
+            if (shouldBlockMovement) {
+                // Se o movimento for bloqueado (Modo Imortal e Parede):
+                // Força rotação e incrementa fome para quebrar o loop.
+                const newForcedDirection = { 
+                    x: -prev.direction.y, 
+                    y: prev.direction.x 
+                };
+                renderStrategy(currentStrategy);
                 
-                cell.className = 'grid-cell rounded-sm transition-all duration-100'; 
+                return { 
+                    ...prev, 
+                    direction: newForcedDirection,
+                    movesWithoutFood: prev.movesWithoutFood + 1 
+                }; 
+            }
+            // Se isImmortal=true e isBodyCollision=true, o código continua e usa newHead normalmente.
 
-                let bgClass = 'bg-gray-800/50';
-                let content = '';
-                let title = '';
+
+            // Se o movimento não foi bloqueado nem fatal, prossegue normalmente.
+            const newSnake = [newHead, ...prev.snake];
+            let newFood = prev.food;
+            let newScore = prev.score;
+            let newMoves = prev.movesWithoutFood + 1;
+            let newCherriesEaten = prev.cherriesEaten;
+            let newSurvivalBonus = prev.survivalBonus;
+
+            // 3. Verificar se comeu
+            if (newHead.x === prev.food.x && newHead.y === prev.food.y) {
+                newCherriesEaten = prev.cherriesEaten + 1;
+                newSurvivalBonus = newCherriesEaten === 1 ? 1 : prev.survivalBonus + 1; 
                 
-                if (window.badMovesCache.has(key)) {
-                    bgClass = 'bg-yellow-900/40 ring-1 ring-yellow-700';
-                    title = 'Caminho Proibido pela IA';
-                }
-
-                if (r === food.r && c === food.c) {
-                    bgClass = 'bg-red-500/90 animate-pulse-slow rounded-full';
-                    content = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" class="text-white drop-shadow-md"><path d="M3 2v7c0 1.1 0.9 2 2 2h4c1.1 0 2-0.9 2-2V2"></path><path d="M7 21v-1.5c0-1.4 1.4-2.5 2.5-2.5h1.5c1.1 0 2-0.9 2-2V2"></path></svg>`;
-                }
-
-                if (snakeSet.has(key)) {
-                    const type = snakeSet.get(key);
-                    if (type === NODE_TYPES.SNAKE_HEAD) {
-                        bgClass = 'bg-green-400 shadow-xl ring-2 ring-lime-200 z-10 rounded-sm animate-pulse-slow transform scale-120'; 
-                        content = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" class="text-green-900"><circle cx="12" cy="12" r="3"></circle><path d="M12 2v2"></path><path d="M4.93 4.93 6.34 6.34"></path><path d="M2 12h2"></path><path d="M4.93 19.07 6.34 17.66"></path><path d="M12 22v-2"></path><path d="M19.07 19.07 17.66 17.66"></path><path d="M22 12h-2"></path><path d="M19.07 4.93 17.66 6.34"></path></svg>`;
-                    } else {
-                        
-                        bgClass = 'bg-green-600/90 shadow-md rounded-sm transform scale-90'; 
-                        content = `<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" class="text-green-800"><path d="m7 12-5 5 5 5 5-5"></path><path d="m14 12-5 5 5 5 5-5"></path></svg>`;
-                    }
-                }
-                
-                cell.className += ` ${bgClass}`;
-                cell.innerHTML = content;
-                if (title) cell.title = title;
-                GRID_CONTAINER.appendChild(cell);
-            }
-        }
-    }
-
-    function updateUI(newStatus = gameStatus, statusClass = null) {
-        STATUS_DISPLAY.textContent = newStatus;
-        SCORE_DISPLAY.textContent = score;
-        CACHE_SIZE_DISPLAY.textContent = window.badMovesCache.size;
-
-        
-        BTN_AI.className = `flex items-center gap-2 px-6 py-2 rounded-lg font-bold shadow-xl transition-all transform hover:scale-105 ${
-            gameMode === GAME_MODE.AI && isRunning ? 'bg-indigo-600 ring-4 ring-indigo-300/50' : 'bg-gray-700 hover:bg-indigo-700 text-white'
-        }`;
-
-        
-        BTN_AI.disabled = isRunning;
-        
-        if (newStatus === "Em andamento...") {
-            STATUS_DISPLAY.className = `text-sm font-mono px-4 py-1 rounded-full ${gameMode === GAME_MODE.AI ? 'bg-indigo-600 shadow-lg' : 'bg-amber-600 shadow-lg'} transition-colors`;
-        } else if (statusClass) {
-            STATUS_DISPLAY.className = `text-sm font-mono px-4 py-1 rounded-full ${statusClass} transition-colors`;
-        } else {
-            STATUS_DISPLAY.className = 'text-sm font-mono px-4 py-1 rounded-full bg-gray-500 shadow-md transition-colors';
-        }
-
-        
-        TOUCH_CONTROLS.style.display = 'none';
-    }
-
-    
-    function findPath(start, target, currentSnake, ignoreTail = false) {
-        const queue = [{ r: start.r, c: start.c, path: [] }];
-        const visited = new Set();
-        
-        const bodyLength = ignoreTail ? currentSnake.length : currentSnake.length - 1;
-        const bodySet = new Set(currentSnake.slice(0, bodyLength).map(s => `${s.r}-${s.c}`));
-
-        if (!ignoreTail && currentSnake.length > 0) {
-            const tail = currentSnake[currentSnake.length - 1];
-            bodySet.delete(`${tail.r}-${tail.c}`);
-        }
-
-        const moves = [{ dr: -1, dc: 0 }, { dr: 1, dc: 0 }, { dr: 0, dc: -1 }, { dr: 0, dc: 1 }];
-
-        while (queue.length > 0) {
-            const current = queue.shift();
-
-            if (current.r === target.r && current.c === target.c) {
-                return current.path; 
-            }
-            
-            for (const { dr, dc } of moves) {
-                const nextR = current.r + dr;
-                const nextC = current.c + dc;
-                const nextKey = `${nextR}-${nextC}`;
-                
-                if (nextR < 0 || nextR >= ROWS || nextC < 0 || nextC >= COLS) continue;
-                
-                if (bodySet.has(nextKey)) continue;
-
-                
-                if (window.badMovesCache.has(nextKey)) continue; 
-
-                if (visited.has(nextKey)) continue;
-
-                visited.add(nextKey);
-                queue.push({
-                    r: nextR,
-                    c: nextC,
-                    path: [...current.path, { dr, dc }]
-                });
-            }
-        }
-        
-        return null; 
-    }
-
-    
-    function getAIDirection() {
-        const head = snake[0];
-        let currentDirection = direction;
-
-        
-        const pathFood = findPath(head, food, snake);
-        
-        if (pathFood && pathFood.length > 0) {
-            return pathFood[0];
-        } 
-        
-        
-        
-        const moves = [{ dr: 0, dc: 1 }, { dr: 0, dc: -1 }, { dr: 1, dc: 0 }, { dr: -1, dc: 0 }];
-        
-        let safeMoves = [];
-        
-        
-        for (const move of moves) {
-            const nextHead = getNextHead(snake, move);
-            const nextKey = `${nextHead.r}-${nextHead.c}`;
-
-            
-            const isCollision = nextHead.r < 0 || nextHead.r >= ROWS ||
-                                nextHead.c < 0 || nextHead.c >= COLS ||
-                                snake.slice(0, -1).some(s => s.r === nextHead.r && s.c === nextHead.c);
-
-            
-            const isLearnedBadMove = window.badMovesCache.has(nextKey);
-            
-            if (!isCollision && !isLearnedBadMove) {
-                safeMoves.push(move);
-            }
-        }
-        
-        if (safeMoves.length > 0) {
-            
-            
-            let preferredOrder = [];
-            const currentR = currentDirection.dr;
-            const currentC = currentDirection.dc;
-            
-            
-            preferredOrder.push(safeMoves.find(m => m.dr === currentR && m.dc === currentC));
-            
-            
-            const ortho1 = safeMoves.find(m => m.dr === -currentC && m.dc === currentR);
-            const ortho2 = safeMoves.find(m => m.dr === currentC && m.dc === -currentR);
-            if (ortho1) preferredOrder.push(ortho1);
-            if (ortho2) preferredOrder.push(ortho2);
-
-            
-            preferredOrder.push(safeMoves.find(m => m.dr === -currentR && m.dc === -currentC));
-
-            
-            const finalMove = preferredOrder.filter(m => m !== undefined && m !== null)[0];
-            
-            return finalMove || safeMoves[0]; 
-        }
-
-        
-        
-        
-        
-        const currentMoves = moves.filter(move => {
-            const nextHead = getNextHead(snake, move);
-            
-            
-            const isSafe = nextHead.r >= 0 && nextHead.r < ROWS &&
-                   nextHead.c >= 0 && nextHead.c < COLS &&
-                   !snake.slice(0, -1).some(s => s.r === nextHead.r && s.c === nextHead.c);
-            
-            return isSafe;
-        });
-
-        if (currentMoves.length > 0) {
-             
-            const safeDirection = currentMoves.find(move => !(move.dr === -currentDirection.dr && move.dc === -currentDirection.dc));
-            return safeDirection || currentMoves[0];
-        }
-
-
-        
-        return currentDirection;
-    }
-
-    
-    
-    
-
-    function endGame(message, headPosition) {
-        if (!isRunning) {
-            if (message && message !== "Em andamento...") {
-                updateUI(message);
-            }
-            return; 
-        }
-
-        isRunning = false;
-        clearInterval(gameLoopInterval);
-        
-        if (message.includes("Colisão")) {
-            
-            if (gameMode === GAME_MODE.AI && headPosition) {
-                window.badMovesCache.add(`${headPosition.r}-${headPosition.c}`);
-                window.saveBadMoves(); 
-            }
-            
-            
-            if (gameMode === GAME_MODE.AI) {
-                updateUI("IA perdeu! Erro na posição: (" + headPosition.r + ", " + headPosition.c + "). Reiniciando...", 'bg-red-800 shadow-xl');
-                setTimeout(() => {
-                    startGame(GAME_MODE.AI); 
-                }, 1000);
+                newFood = generateFood(newSnake);
+                newScore = prev.score + 100; 
+                newMoves = 0;
             } else {
-                 updateUI("Game Over! " + message, 'bg-red-600 shadow-lg');
+                newSnake.pop(); 
+                
+                if (prev.cherriesEaten > 0) {
+                    newScore = prev.score + prev.survivalBonus;
+                }
             }
-        } else {
-            updateUI(message);
-        }
-    }
 
-    function gameTick() {
-        let currentDirection;
-        
-        if (gameMode === GAME_MODE.AI) {
-            currentDirection = getAIDirection();
-        } else {
-            currentDirection = direction;
-        }
+            // 4. Timeout
+            if (newMoves > TIMEOUT_MOVES) {
+                if (prev.score > bestScore) bestScore = prev.score;
+                totalGames++;
+                generation++;
+                stopGameLoop();
+                setTimeout(resetGame, 500);
+                gameState = { ...prev, gameOver: true, survivalBonus: 0 };
+                render();
+                return;
+            }
 
-        const newHead = getNextHead(snake, currentDirection);
-        lastHeadPosition = newHead;
-
-        const bodyForCollisionCheck = snake.slice(0, snake.length - 1); 
-        
-        const collidesWithBody = bodyForCollisionCheck.some((segment, index) => 
-            index !== 0 && segment.r === newHead.r && segment.c === newHead.c
-        );
-
-        if (
-            newHead.r < 0 || newHead.r >= ROWS ||
-            newHead.c < 0 || newHead.c >= COLS ||
-            collidesWithBody 
-        ) {
-            endGame("Colisão.", newHead); 
-            return;
+            gameState = {
+                snake: newSnake,
+                food: newFood,
+                direction: newDirection,
+                score: newScore,
+                movesWithoutFood: newMoves,
+                gameOver: false,
+                survivalBonus: newSurvivalBonus,
+                cherriesEaten: newCherriesEaten
+            };
+            
+            render();
         }
 
-        const newSnake = [newHead, ...snake];
-        let ateFood = false;
+        // --- FUNÇÕES DE RENDERIZAÇÃO ---
 
-        if (newHead.r === food.r && newHead.c === food.c) {
-            score++;
-            speed = Math.max(MAX_SPEED, speed - 5); 
-            food = getRandomFoodPosition(newSnake);
-            ateFood = true;
-        } else {
-            newSnake.pop(); 
-        }
+        function renderGameGrid() {
+            gameGridEl.style.gridTemplateColumns = `repeat(${GRID_SIZE}, ${CELL_SIZE}px)`;
+            gameGridEl.style.gridTemplateRows = `repeat(${GRID_SIZE}, ${CELL_SIZE}px)`;
+            
+            // Limpa o grid
+            gameGridEl.innerHTML = '';
+            
+            const cells = [];
+            // Adiciona todas as células ao DOM
+            for (let i = 0; i < GRID_SIZE * GRID_SIZE; i++) {
+                const x = i % GRID_SIZE;
+                const y = Math.floor(i / GRID_SIZE);
+                const cell = document.createElement('div');
+                cell.className = 'cell absolute bg-gray-900/5';
+                // Define a posição da célula para ser usada pelo JS para renderização
+                cell.style.left = `${x * CELL_SIZE}px`;
+                cell.style.top = `${y * CELL_SIZE}px`;
+                cell.style.width = `${CELL_SIZE}px`;
+                cell.style.height = `${CELL_SIZE}px`;
+                cell.id = `cell-${x}-${y}`;
+                cells.push(cell);
+            }
+            gameGridEl.append(...cells);
 
-        snake = newSnake;
-        direction = currentDirection; 
+            // 1. Renderizar Caminho Visual (se houver)
+            visualPath.slice(1, -1).forEach(seg => {
+                const cell = document.getElementById(`cell-${seg.x}-${seg.y}`);
+                if (cell) {
+                    cell.classList.add('path');
+                    cell.style.width = `${CELL_SIZE - 4}px`;
+                    cell.style.height = `${CELL_SIZE - 4}px`;
+                    cell.style.margin = `2px`;
+                }
+            });
 
-        if (ateFood) {
-            clearInterval(gameLoopInterval);
-            gameLoopInterval = setInterval(gameTick, speed);
-        }
+            // 2. Renderizar Cobra
+            gameState.snake.forEach((seg, index) => {
+                const cell = document.getElementById(`cell-${seg.x}-${seg.y}`);
+                if (cell) {
+                    cell.className = 'cell absolute'; // Reset classes
+                    if (index === 0) {
+                        cell.classList.add('snake-head');
+                    } else if (index === gameState.snake.length - 1) {
+                        cell.classList.add('snake-tail');
+                    } else {
+                        cell.classList.add('snake-body');
+                    }
+                    cell.style.width = `${CELL_SIZE - 2}px`;
+                    cell.style.height = `${CELL_SIZE - 2}px`;
+                    cell.style.margin = `1px`;
+                }
+            });
 
-        updateUI("Em andamento...");
-        drawGrid();
-    }
-
-    function startGame(mode) {
-        snake = [...INITIAL_SNAKE];
-        food = getRandomFoodPosition(snake);
-        direction = { dr: 0, dc: 1 };
-        speed = INITIAL_SPEED;
-        score = 0;
-        gameMode = mode;
-        isRunning = true;
-        
-        if (gameLoopInterval) {
-             clearInterval(gameLoopInterval);
-        }
-        
-        endGame("Em andamento...");
-        gameLoopInterval = setInterval(gameTick, speed);
-        updateUI("Em andamento...");
-        drawGrid();
-    }
-
-    function resetGame() {
-        endGame("Pressione Iniciar para Jogar ou IA");
-        snake = [...INITIAL_SNAKE];
-        food = getRandomFoodPosition(snake);
-        score = 0;
-        gameMode = GAME_MODE.IDLE;
-        window.badMovesCache = new Set(); 
-        window.saveBadMoves(); 
-        drawGrid();
-    }
-
-    
-    
-    
-
-    function handleKeyDown(e) {
-        if (!isRunning || gameMode !== GAME_MODE.HUMAN) return;
-
-        const newDirection = { dr: 0, dc: 0 };
-
-        if (e.key === 'ArrowUp') newDirection.dr = -1;
-        else if (e.key === 'ArrowDown') newDirection.dr = 1;
-        else if (e.key === 'ArrowLeft') newDirection.dc = -1;
-        else if (e.key === 'ArrowRight') newDirection.dc = 1;
-
-        if (newDirection.dr !== 0 || newDirection.dc !== 0) {
-            if (!(newDirection.dr === -direction.dr && newDirection.dc === -direction.dc)) {
-                direction = newDirection;
+            // 3. Renderizar Comida
+            const foodCell = document.getElementById(`cell-${gameState.food.x}-${gameState.food.y}`);
+            if (foodCell) {
+                foodCell.className = 'cell absolute food animate-pulse';
+                foodCell.innerHTML = '🍒';
+                foodCell.style.width = `${CELL_SIZE - 4}px`;
+                foodCell.style.height = `${CELL_SIZE - 4}px`;
+                foodCell.style.margin = `2px`;
             }
         }
-    }
 
-    window.addEventListener('keydown', handleKeyDown);
-
-    window.setManualDirection = function(dr, dc) {
-        if (!isRunning || gameMode !== GAME_MODE.HUMAN) return;
-        const newDirection = { dr, dc };
-        if (!(newDirection.dr === -direction.dr && newDirection.dc === -direction.dc)) { 
-            direction = newDirection;
+        function renderStats() {
+            const statsHTML = `
+                <div class="bg-gray-800 p-3 rounded-lg border border-gray-700">
+                    <div class="text-xs text-gray-400 mb-1">Geração</div>
+                    <div class="text-2xl font-bold text-blue-400">#${generation}</div>
+                </div>
+                <div class="bg-gray-800 p-3 rounded-lg border border-gray-700">
+                    <div class="text-xs text-gray-400 mb-1">Pontos</div>
+                    <div class="text-2xl font-bold text-green-400">${gameState.score.toLocaleString()}</div>
+                    ${gameState.cherriesEaten > 0 ? `<div class="text-xs text-yellow-400 mt-1"> +${gameState.survivalBonus}/movimento</div>` : `<div class="text-xs text-gray-500 mt-1">Pegue cereja primeiro</div>`}
+                </div>
+                <div class="bg-gray-800 p-3 rounded-lg border border-gray-700">
+                    <div class="text-xs text-gray-400 mb-1">Tamanho</div>
+                    <div class="text-2xl font-bold text-purple-400">${gameState.snake.length}</div>
+                    <div class="text-xs text-gray-500 mt-1">Reset em ${autoResetInput.value}</div>
+                </div>
+                <div class="bg-gray-800 p-3 rounded-lg border border-gray-700">
+                    <div class="text-xs text-gray-400 mb-1">🍒 Cerejas</div>
+                    <div class="text-2xl font-bold text-red-400">${gameState.cherriesEaten}</div>
+                </div>
+            `;
+            statsGridEl.innerHTML = statsHTML;
         }
-    }
-
-    
-    window.initializeGame = function() {
         
-        BTN_AI.addEventListener('click', () => startGame(GAME_MODE.AI));
-        BTN_RESET.addEventListener('click', resetGame);
+        function renderFoodIndicator() {
+            if (gameState.snake.length === 0) return;
+            const distance = Math.abs(gameState.snake[0].x - gameState.food.x) + Math.abs(gameState.snake[0].y - gameState.food.y);
+            foodIndicatorEl.innerHTML = `
+                🍒 Cereja: (${gameState.food.x}, ${gameState.food.y})
+                <span class="text-red-200"> | Distância: ${distance}</span>
+            `;
+        }
         
-        endGame("Carregamento concluído. IA pronta.", 'bg-gray-500 shadow-md'); 
+        function renderFooterStats() {
+            footerStatsEl.innerHTML = `
+                Jogos: ${totalGames} | Recorde: ${bestScore.toLocaleString()} pts | Velocidade: ${gameDelay}ms | Timeout: ${TIMEOUT_MOVES} movimentos.
+            `;
+        }
         
-        setTimeout(() => {
-             startGame(GAME_MODE.AI);
-        }, 500); 
-    };
+        function renderStrategy(currentStrategy) {
+            strategyStatusEl.innerHTML = `
+                <span class="text-xs text-gray-400">Estratégia: </span>
+                <span class="text-sm font-bold text-white">${currentStrategy}</span>
+            `;
+        }
 
-    document.addEventListener('DOMContentLoaded', () => {
-         window.loadBadMoves(); 
-         window.initializeGame();
-    });
+        function renderPathStatus(found, length, strategy) {
+            const isAggressive = strategy.includes('Agressiva') || strategy.includes('FOME') || strategy.includes('IMORTAL');
+            pathStatusEl.className = `px-4 py-2 rounded-lg border ${isAggressive ? 'bg-green-900/50 border-green-700' : 'bg-blue-900/50 border-blue-700'}`;
+            const pathText = found ? `✓ ${length} movimentos` : '✗ Seguindo Cauda';
 
-</script>
+            pathStatusEl.innerHTML = `
+                <span class="text-xs text-gray-400">Caminho: </span>
+                <span class="text-sm font-bold ${found || isAggressive ? 'text-green-400' : 'text-blue-400'}">
+                    ${pathText}
+                </span>
+            `;
+        }
+        
+        function renderUIControls() {
+            // Play/Pause button
+            if (isPlaying) {
+                playPauseText.textContent = 'Pausar';
+                playPauseIcon.innerHTML = `<polygon points="10 3 10 21 14 21 14 3 10 3"></polygon><polygon points="14 3 14 21 18 21 18 3 14 3"></polygon>`;
+            } else {
+                playPauseText.textContent = 'Iniciar';
+                playPauseIcon.innerHTML = `<polygon points="5 3 19 12 5 21 5 3"></polygon>`;
+            }
+        }
+        
+        function renderImmortalControl() {
+            immortalControlEl.innerHTML = `
+                <label for="immortalMode" class="text-sm font-semibold text-red-400 cursor-pointer flex items-center gap-2">
+                    <input
+                        type="checkbox"
+                        id="immortalMode"
+                        ${isImmortal ? 'checked' : ''}
+                        onchange="toggleImmortalMode(this.checked)"
+                        class="h-4 w-4 text-red-600 bg-gray-700 border-gray-600 rounded focus:ring-red-500"
+                    />
+                    Modo Imortal
+                </label>
+            `;
+        }
+        
+        // Função de toggle globalmente acessível
+        window.toggleImmortalMode = (checked) => {
+            isImmortal = checked;
+            renderImmortalControl();
+            if (isPlaying) {
+                stopGameLoop();
+                startGameLoop(); // Reinicia o loop com a nova configuração
+            }
+        };
 
+        function render() {
+            renderGameGrid();
+            renderStats();
+            renderFoodIndicator();
+            renderFooterStats();
+            renderUIControls();
+        }
+
+        // --- INICIALIZAÇÃO E EVENTOS ---
+        window.onload = function() {
+            // Ajustar o tamanho da área do jogo
+            gameAreaContainerEl.style.width = `${GRID_SIZE * CELL_SIZE}px`;
+            gameAreaContainerEl.style.height = `${GRID_SIZE * CELL_SIZE}px`;
+
+            resetGame();
+            renderImmortalControl();
+
+            // Event Listeners
+            playPauseBtn.onclick = () => {
+                if (isPlaying) {
+                    stopGameLoop();
+                } else {
+                    startGameLoop();
+                }
+            };
+
+            hardResetBtn.onclick = () => {
+                if (bestScore < gameState.score) bestScore = gameState.score;
+                generation = 1;
+                totalGames = 0;
+                resetGame();
+            };
+
+            gameDelayInput.onchange = (e) => {
+                const newDelay = Math.max(1, parseInt(e.target.value) || DEFAULT_GAME_DELAY);
+                gameDelay = newDelay;
+                e.target.value = newDelay; // Corrige o valor na UI
+                if (isPlaying) {
+                    stopGameLoop();
+                    startGameLoop();
+                }
+                renderFooterStats();
+            };
+            
+            autoResetInput.onchange = renderStats; // Atualiza a UI do Auto-reset
+        };
+    </script>
 </body>
 </html>
